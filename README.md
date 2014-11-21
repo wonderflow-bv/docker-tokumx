@@ -26,3 +26,5 @@ $ make start-cluster
 $ make stop-cluster
 ```
 
+## Credits
+Most of the work in figuring out this puzzle was done by @wdalmut who created the script to wire up a simpler mongodb sharded cluster. Kudos!
