@@ -1,6 +1,6 @@
 all: start-cluster
 
-mongodb-container:
+tokumx-container:
 	sudo docker pull "ankurcha/tokumx"
 
 start-cluster:
