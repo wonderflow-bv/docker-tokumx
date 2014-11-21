@@ -9,7 +9,7 @@ This is a [Docker](http://docker.io) project to bring up a local [TokuMX](http:/
 ```bash
 $ git clone https://github.com/ankurcha/docker-tokumx.git
 $ cd docker-tokumx
-$ make mongodb-container
+$ make tokumx-container
 ```
 
 The statement `make tokumx-container` will download the image from docker index.
