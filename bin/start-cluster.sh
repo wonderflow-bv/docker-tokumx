@@ -51,7 +51,7 @@ CONFIG0_ID=$(sudo docker run -d ankurcha/tokumx mongod --configsvr  --dbpath /da
 CONFIG0_IP=$(sudo docker inspect ${CONFIG0_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 echo "Your config container ${CONFIG0_ID} listen on ip: ${CONFIG0_IP} (waiting that becomes ready)"
 
-until sudo docker logs ${CONFIG0_ID} | grep "[initandlisten] waiting for connections on port" >/dev/null;
+until sudo docker logs ${CONFIG0_ID} | grep "waiting for connections on port" >/dev/null;
 do
     sleep 2
 done
