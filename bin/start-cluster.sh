@@ -1,5 +1,10 @@
 #!/bin/bash
 
+### TODO 1  - create function `create_replica_set n` that creates n replica sets
+### TODO 2  - create function `create_mongos` that instantiates mongos 
+### TODO 3  - create a function that create n replica sets and n shards
+
+
 set -e
 
 if sudo docker ps | grep "ankurcha/tokumx" >/dev/null; then
