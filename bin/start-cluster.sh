@@ -52,7 +52,7 @@ done
 
 echo "initialize replicaset"
 mongo ${SHARD00_IP}:10000 --eval "rs.initiate({_id: \"rs0\", members: [{_id:0, host:\"${SHARD00_IP}:10000\"}, {_id:1, host:\"${SHARD01_IP}:10001\"}, {_id:2, host:\"${SHARD02_IP}:10002\"}]});"
-until sudo docker logs ${SHARD00_ID} | grep "replSet PRIMARY" >/dev/null;
+until sudo docker logs ${SHARD00_ID} | grep "state PRIMARY" >/dev/null;
 do
     sleep 2
 done
