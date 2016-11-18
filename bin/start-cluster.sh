@@ -27,7 +27,7 @@ SHARD00_ID=$(sudo docker run -d $IMAGE mongod --replSet rs0 --shardsvr --logpath
 SHARD00_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SHARD00_ID`
 #echo `sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' "$@" $SHARD00_ID`
 echo "Your shard container ${SHARD00_ID} listen on ip: ${SHARD00_IP} (waiting that becomes ready)"
-until sudo docker logs ${SHARD00_ID} | grep "replSet info you may need to run replSetInitiate" >/dev/null;
+until sudo docker logs ${SHARD00_ID} | grep "waiting for connections on port 10000" >/dev/null;
 do
     sleep 2
 done
@@ -36,7 +36,7 @@ SHARD01_ID=$(sudo docker run -d $IMAGE mongod --replSet rs0 --shardsvr --logpath
 #SHARD01_IP=$(sudo docker inspect ${SHARD01_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 SHARD01_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SHARD01_ID`
 echo "Your shard container ${SHARD01_ID} listen on ip: ${SHARD01_IP} (waiting that becomes ready)"
-until sudo docker logs ${SHARD01_ID} | grep "replSet info you may need to run replSetInitiate" >/dev/null;
+until sudo docker logs ${SHARD01_ID} | grep "waiting for connections on port 10001" >/dev/null;
 do
     sleep 2
 done
@@ -45,7 +45,7 @@ SHARD02_ID=$(sudo docker run -d $IMAGE mongod --replSet rs0 --shardsvr --logpath
 #SHARD02_IP=$(sudo docker inspect ${SHARD02_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 SHARD02_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SHARD02_ID`
 echo "Your shard container ${SHARD02_ID} listen on ip: ${SHARD02_IP} (waiting that becomes ready)"
-until sudo docker logs ${SHARD02_ID} | grep "replSet info you may need to run replSetInitiate" >/dev/null;
+until sudo docker logs ${SHARD02_ID} | grep "waiting for connections on port 10002" >/dev/null;
 do
     sleep 2
 done
