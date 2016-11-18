@@ -4,10 +4,12 @@
 ### TODO 2  - create function `create_mongos` that instantiates mongos 
 ### TODO 3  - create a function that create n replica sets and n shards
 
+#IMAGE="ankurcha/tokumx"
+IMAGE="mongo"
 
 set -e
 
-if sudo docker ps | grep "ankurcha/tokumx" >/dev/null; then
+if sudo docker ps | grep $IMAGE >/dev/null; then
     echo ""
     echo "It looks like you already have some containers running."
     echo "Please take them down before attempting to bring up another"
@@ -20,7 +22,7 @@ if sudo docker ps | grep "ankurcha/tokumx" >/dev/null; then
 fi
 
 # start docker containers for 3xreplicaset rs0
-SHARD00_ID=$(sudo docker run -d ankurcha/tokumx mongod --replSet rs0 --shardsvr --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10000)
+SHARD00_ID=$(sudo docker run -d $IMAGE mongod --replSet rs0 --shardsvr --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10000)
 #SHARD00_IP=$(sudo docker inspect ${SHARD00_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 SHARD00_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SHARD00_ID`
 #echo `sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' "$@" $SHARD00_ID`
@@ -30,7 +32,7 @@ do
     sleep 2
 done
 
-SHARD01_ID=$(sudo docker run -d ankurcha/tokumx mongod --replSet rs0 --shardsvr --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10001)
+SHARD01_ID=$(sudo docker run -d $IMAGE mongod --replSet rs0 --shardsvr --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10001)
 #SHARD01_IP=$(sudo docker inspect ${SHARD01_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 SHARD01_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SHARD01_ID`
 echo "Your shard container ${SHARD01_ID} listen on ip: ${SHARD01_IP} (waiting that becomes ready)"
@@ -39,7 +41,7 @@ do
     sleep 2
 done
 
-SHARD02_ID=$(sudo docker run -d ankurcha/tokumx mongod --replSet rs0 --shardsvr --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10002)
+SHARD02_ID=$(sudo docker run -d $IMAGE mongod --replSet rs0 --shardsvr --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10002)
 #SHARD02_IP=$(sudo docker inspect ${SHARD02_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 SHARD02_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SHARD02_ID`
 echo "Your shard container ${SHARD02_ID} listen on ip: ${SHARD02_IP} (waiting that becomes ready)"
@@ -56,7 +58,7 @@ do
 done
 echo "The shard replset is available now..."
 
-CONFIG0_ID=$(sudo docker run -d ankurcha/tokumx mongod --configsvr  --dbpath /data/ --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10000)
+CONFIG0_ID=$(sudo docker run -d $IMAGE mongod --configsvr  --dbpath /data/ --logpath /dev/stdout --bind_ip 0.0.0.0 --port 10000)
 #CONFIG0_IP=$(sudo docker inspect ${CONFIG0_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 CONFIG0_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONFIG0_ID`
 echo "Your config container ${CONFIG0_ID} listen on ip: ${CONFIG0_IP} (waiting that becomes ready)"
@@ -68,7 +70,7 @@ done
 
 echo "The config is available now..."
 
-MONGOS0_ID=$(sudo docker run -p 9999:9999 -d ankurcha/tokumx mongos --configdb ${CONFIG0_IP}:10000 --logpath /dev/stdout --bind_ip 0.0.0.0 --port 9999)
+MONGOS0_ID=$(sudo docker run -p 9999:9999 -d $IMAGE mongos --configdb ${CONFIG0_IP}:10000 --logpath /dev/stdout --bind_ip 0.0.0.0 --port 9999)
 #MONGOS0_IP=$(sudo docker inspect ${MONGOS0_ID} | grep "IPAddress" | cut -d':' -f2 | cut -d'"' -f2)
 MONGOS0_IP=`sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $MONGOS0_ID`
 echo "Contacting shard and mongod containers"
