@@ -9,5 +9,5 @@ start-cluster:
 stop-cluster:
 	bash ./bin/stop-cluster.sh
 
-restart-cluster:
+rebuild-cluster:
 	./stop-remove-restart-all.sh
