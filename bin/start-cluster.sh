@@ -4,25 +4,21 @@
 ### TODO 2  - create function `create_mongos` that instantiates mongos 
 ### TODO 3  - create a function that create n replica sets and n shards
 
-NAME_INDEX=0
-NAME_CFG_INDEX=0
-NAME_MONGOS_INDEX=0
-PORT_INDEX=10000
-MONGOS_PORT=9999
+MONGOS_PORT=27017
 IMAGE="mongo"
 NET="my-mongo-cluster"
 BIND_ADDRESS=0.0.0.0
 
 start_mongod_docker() {
-    echo `sudo docker run --detach --name mongo${NAME_INDEX} --net ${NET} ${IMAGE} mongod --replSet rs0 --shardsvr --bind_ip ${BIND_ADDRESS} --port ${PORT_INDEX}`
+    echo `sudo docker run --detach --net ${NET} ${IMAGE} mongod --replSet rs0 --shardsvr --bind_ip ${BIND_ADDRESS}`
 }
 
 start_mongocfg_docker() {
-    echo `sudo docker run --detach --name mongocfg${NAME_CFG_INDEX} --net ${NET} ${IMAGE} mongod --configsvr --bind_ip ${BIND_ADDRESS} --port ${PORT_INDEX}`
+    echo `sudo docker run --detach --net ${NET} ${IMAGE} mongod --configsvr --bind_ip ${BIND_ADDRESS}`
 }
 
 start_mongos_docker() {
-    echo `sudo docker run --detach -p ${MONGOS_PORT}:${MONGOS_PORT} --name mongos${NAME_MONGOS_INDEX} --net ${NET} ${IMAGE} mongos --configdb ${1}:${2} --bind_ip ${BIND_ADDRESS} --port ${MONGOS_PORT}`
+    echo `sudo docker run --detach -p ${MONGOS_PORT}:${MONGOS_PORT} --net ${NET} ${IMAGE} mongos --configdb ${1} --bind_ip ${BIND_ADDRESS}`
 }
 
 get_ip_from_id() {
@@ -51,8 +47,6 @@ until sudo docker logs ${SHARD00_ID} | grep "waiting for connections on port" > 
 do
     sleep 2
 done
-echo NAME_INDEX $((NAME_INDEX++))
-echo PORT_INDEX $((PORT_INDEX++))
 
 SHARD01_ID=`start_mongod_docker`
 SHARD01_IP=`get_ip_from_id $SHARD01_ID`
@@ -61,8 +55,6 @@ until sudo docker logs ${SHARD01_ID} | grep "waiting for connections on port" > 
 do
     sleep 2
 done
-echo NAME_INDEX $((NAME_INDEX++))
-echo PORT_INDEX $((PORT_INDEX++))
 
 SHARD02_ID=`start_mongod_docker`
 SHARD02_IP=`get_ip_from_id $SHARD02_ID`
@@ -71,17 +63,12 @@ until sudo docker logs ${SHARD02_ID} | grep "waiting for connections on port" > 
 do
     sleep 2
 done
-echo NAME_INDEX $((NAME_INDEX++))
-echo PORT_INDEX $((PORT_INDEX++))
 
 echo "initialize replicaset"
-sudo docker exec ${SHARD00_ID} mongo localhost:10000 --eval "rs.initiate();" > /dev/null
-echo mongo ${SHARD00_IP}:10000 --eval "rs.initiate();"
-sudo docker exec ${SHARD00_ID} mongo localhost:10000 --eval "rs.add(\"${SHARD01_IP}:10001\");" > /dev/null
-echo mongo ${SHARD00_IP}:10000 --eval "rs.add(\"${SHARD01_IP}:10001\");"
-sudo docker exec ${SHARD00_ID} mongo localhost:10000 --eval "rs.add(\"${SHARD02_IP}:10002\");" > /dev/null
-echo mongo ${SHARD00_IP}:10000 --eval "rs.add(\"${SHARD02_IP}:10002\");"
-until sudo docker logs ${SHARD00_ID} | grep "10002 is now in state SECONDARY" > /dev/null;
+sudo docker exec ${SHARD00_ID} mongo --port 27018 --eval "rs.initiate();" > /dev/null
+sudo docker exec ${SHARD00_ID} mongo --port 27018 --eval "rs.add(\"${SHARD01_IP}:27018\");" > /dev/null
+sudo docker exec ${SHARD00_ID} mongo --port 27018 --eval "rs.add(\"${SHARD02_IP}:27018\");" > /dev/null
+until sudo docker logs ${SHARD00_ID} | grep "is now in state SECONDARY" > /dev/null;
 do
     sleep 2
 done
@@ -95,12 +82,10 @@ until sudo docker logs ${CONFIG0_ID} | grep "waiting for connections on port" > 
 do
     sleep 2
 done
-echo NAME_CFG_INDEX $((NAME_CFG_INDEX++))
-echo PORT_INDEX $((PORT_INDEX++))
 
 echo "The config is available now..."
 
-MONGOS0_ID=`start_mongos_docker ${CONFIG0_IP} $((PORT_INDEX - 1))`
+MONGOS0_ID=`start_mongos_docker ${CONFIG0_IP}:27019`
 MONGOS0_IP=`get_ip_from_id $MONGOS0_ID`
 echo "Contacting shard and mongod containers"
 
@@ -110,8 +95,8 @@ do
 done
 
 # Add the shard
-mongo ${MONGOS0_IP}:${MONGOS_PORT} --eval "sh.addShard(\"rs0/${SHARD00_IP}:10000,${SHARD01_IP}:10001,${SHARD02_IP}:10002\");"
+sudo docker exec ${MONGOS0_ID} mongo --eval "sh.addShard(\"rs0/${SHARD00_IP}:27018,${SHARD01_IP}:27018,${SHARD02_IP}:27018\");" > /dev/null
 
 echo "OK, you can connect to mongos using: "
-echo "mongo ${MONGOS0_IP}:${MONGOS_PORT}"
+echo "mongo ${MONGOS0_IP}"
 
