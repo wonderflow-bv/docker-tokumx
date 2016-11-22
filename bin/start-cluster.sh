@@ -5,32 +5,81 @@
 ### TODO 3  - create a function that create n replica sets and n shards
 
 MONGOS_PORT=27017
-IMAGE="mongo"
+SHARDS_PORT=27018
+CONFIG_PORT=27019
+IMAGE="mongo:3.2"
 NET="my-mongo-cluster"
 BIND_ADDRESS=0.0.0.0
 
 set -e
 
+get_ip_from_id() {
+    echo `sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${1}`
+}
+
 start_mongod_docker() {
-    DATA_PATH=/data/shard${1}${2}
-    sudo mkdir -p $DATA_PATH > /dev/null
-    echo `sudo docker run --detach -v /data --net ${NET} ${IMAGE} mongod --replSet rs$1 --shardsvr --bind_ip ${BIND_ADDRESS}`
+    DATA_PATH="/data/db/shard${1}${2}"
+    echo `sudo docker run --detach -v ${DATA_PATH}:${DATA_PATH} --net ${NET} ${IMAGE} mongod --replSet rs$1 --dbpath ${DATA_PATH} --shardsvr --bind_ip ${BIND_ADDRESS}`
 }
 
 start_mongocfg_docker() {
-    echo `sudo docker run --detach --net ${NET} ${IMAGE} mongod --configsvr --bind_ip ${BIND_ADDRESS}`
+    CFG_PATH="/data/configdb/cfg${1}"
+    echo `sudo docker run --detach -v ${CFG_PATH}:${CFG_PATH} --net ${NET} ${IMAGE} mongod --dbpath ${CFG_PATH} --replSet cfg --configsvr --bind_ip ${BIND_ADDRESS}`
 }
 
 start_mongos_docker() {
     echo `sudo docker run --detach -p ${MONGOS_PORT}:${MONGOS_PORT} --net ${NET} ${IMAGE} mongos --configdb ${1} --bind_ip ${BIND_ADDRESS}`
 }
 
-get_ip_from_id() {
-    echo `sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${1}`
+start_mongocfg_replica_docker() {
+    CFG0_ID=`start_mongocfg_docker 0`
+    CFG0_IP=`get_ip_from_id $CFG0_ID`
+    until sudo docker logs ${CFG0_ID} | grep "waiting for connections on port" > /dev/null;
+    do
+        sleep 2
+    done
+
+    CFG1_ID=`start_mongocfg_docker 1`
+    CFG1_IP=`get_ip_from_id $CFG1_ID`
+    until sudo docker logs ${CFG1_ID} | grep "waiting for connections on port" > /dev/null
+    do
+        sleep 2
+    done
+
+    CFG2_ID=`start_mongocfg_docker 2`
+    CFG2_IP=`get_ip_from_id $CFG2_ID`
+    until sudo docker logs ${CFG2_ID} | grep "waiting for connections on port" > /dev/null;
+    do
+        sleep 2
+    done
+
+    sudo docker exec ${CFG0_ID} mongo --port ${CONFIG_PORT} --eval "rs.initiate();" > /dev/null;
+    until sudo docker logs ${CFG0_ID} | grep "PRIMARY" > /dev/null;
+    do
+        sleep 2
+    done
+
+    sudo docker exec ${CFG0_ID} mongo --port ${CONFIG_PORT} --eval "cfg = rs.conf(); cfg.members[0].host = \"${CFG0_IP}:${CONFIG_PORT}\"; rs.reconfig(cfg);" > /dev/null;
+    until sudo docker logs ${CFG0_ID} | grep "This node is ${CFG0_IP}:${CONFIG_PORT} in the config" > /dev/null;
+    do
+        sleep 2
+    done
+    
+    sudo docker exec ${CFG0_ID} mongo --port ${CONFIG_PORT} --eval "rs.add(\"${CFG1_IP}:${CONFIG_PORT}\");" > /dev/null
+    sudo docker exec ${CFG0_ID} mongo --port ${CONFIG_PORT} --eval "rs.add(\"${CFG2_IP}:${CONFIG_PORT}\");" > /dev/null
+    until sudo docker logs ${CFG0_ID} | grep "Member ${CFG1_IP}:${CONFIG_PORT} is now in state SECONDARY" > /dev/null;
+    do
+        sleep 2
+    done
+    until sudo docker logs ${CFG0_ID} | grep "Member ${CFG2_IP}:${CONFIG_PORT} is now in state SECONDARY" > /dev/null;
+    do
+        sleep 2
+    done
+
+    echo "cfg/${CFG0_IP}:${CONFIG_PORT},${CFG1_IP}:${CONFIG_PORT},${CFG2_IP}:${CONFIG_PORT}"
 }
 
 start_shard() {
-    # start docker containers for 3xreplicaset rs0
     SHARD00_ID=`start_mongod_docker $1 0`
     SHARD00_IP=`get_ip_from_id $SHARD00_ID`
     echo "Your shard container ${SHARD00_ID} listen on ip: ${SHARD00_IP} (waiting that becomes ready)"
@@ -56,33 +105,32 @@ start_shard() {
     done
 
     echo "initialize replicaset"
-    sudo docker exec ${SHARD00_ID} mongo --port 27018 --eval "rs.initiate();"
+    sudo docker exec ${SHARD00_ID} mongo --port ${SHARDS_PORT} --eval "rs.initiate();"
     until sudo docker logs ${SHARD00_ID} | grep "PRIMARY" > /dev/null;
     do
         sleep 2
     done
 
     echo "patching host for docker"
-    sudo docker exec ${SHARD00_ID} mongo --port 27018 --eval "cfg = rs.conf(); cfg.members[0].host = \"${SHARD00_IP}:27018\"; rs.reconfig(cfg);"
-    until sudo docker logs ${SHARD00_ID} | grep "This node is ${SHARD00_IP}:27018 in the config" > /dev/null;
+    sudo docker exec ${SHARD00_ID} mongo --port ${SHARDS_PORT} --eval "cfg = rs.conf(); cfg.members[0].host = \"${SHARD00_IP}:${SHARDS_PORT}\"; rs.reconfig(cfg);"
+    until sudo docker logs ${SHARD00_ID} | grep "This node is ${SHARD00_IP}:${SHARDS_PORT} in the config" > /dev/null;
     do
         sleep 2
     done
     
-    sudo docker exec ${SHARD00_ID} mongo --port 27018 --eval "rs.add(\"${SHARD01_IP}:27018\");" > /dev/null
-    sudo docker exec ${SHARD00_ID} mongo --port 27018 --eval "rs.add(\"${SHARD02_IP}:27018\");" > /dev/null
-    until sudo docker logs ${SHARD00_ID} | grep "Member ${SHARD01_IP}:27018 is now in state SECONDARY" > /dev/null;
+    sudo docker exec ${SHARD00_ID} mongo --port ${SHARDS_PORT} --eval "rs.add(\"${SHARD01_IP}:${SHARDS_PORT}\");" > /dev/null
+    sudo docker exec ${SHARD00_ID} mongo --port ${SHARDS_PORT} --eval "rs.add(\"${SHARD02_IP}:${SHARDS_PORT}\");" > /dev/null
+    until sudo docker logs ${SHARD00_ID} | grep "Member ${SHARD01_IP}:${SHARDS_PORT} is now in state SECONDARY" > /dev/null;
     do
         sleep 2
     done
-    until sudo docker logs ${SHARD00_ID} | grep "Member ${SHARD02_IP}:27018 is now in state SECONDARY" > /dev/null;
+    until sudo docker logs ${SHARD00_ID} | grep "Member ${SHARD02_IP}:${SHARDS_PORT} is now in state SECONDARY" > /dev/null;
     do
         sleep 2
     done
     echo "The shard replset is available now..."
 
-    # Add the shard
-    echo `sudo docker exec ${MONGOS0_ID} mongo --eval "sh.addShard(\"rs$1/${SHARD00_IP}:27018,${SHARD01_IP}:27018,${SHARD02_IP}:27018\");"`
+    echo `sudo docker exec ${MONGOS0_ID} mongo --eval "sh.addShard(\"rs$1/${SHARD00_IP}:${SHARDS_PORT},${SHARD01_IP}:${SHARDS_PORT},${SHARD02_IP}:${SHARDS_PORT}\");"`
     echo "Contacting shard and mongod containers rs$1"
     until sudo docker logs ${MONGOS0_ID} | grep "config servers and shards contacted successfully" > /dev/null;
     do
@@ -102,21 +150,17 @@ if sudo docker ps | grep $IMAGE >/dev/null; then
     exit 1
 fi
 
-CONFIG0_ID=`start_mongocfg_docker`
-CONFIG0_IP=`get_ip_from_id $CONFIG0_ID`
-echo "Your config container ${CONFIG0_ID} listen on ip: ${CONFIG0_IP} (waiting that becomes ready)"
+echo "Preparing config db..."
 
-until sudo docker logs ${CONFIG0_ID} | grep "waiting for connections on port" > /dev/null;
-do
-    sleep 2
-done
+CONFIG0=`start_mongocfg_replica_docker`
 
-echo "The config is available now..."
+echo "The config is available now @ ${CONFIG0}..."
 
-MONGOS0_ID=`start_mongos_docker ${CONFIG0_IP}:27019`
+MONGOS0_ID=`start_mongos_docker ${CONFIG0}`
 MONGOS0_IP=`get_ip_from_id $MONGOS0_ID`
 
 for i in `seq 0 $((${1:-1} - 1))`; do
+    echo "Starting shard #$i creation..."
     start_shard $i
 done
 
