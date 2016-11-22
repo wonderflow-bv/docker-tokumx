@@ -12,7 +12,9 @@ BIND_ADDRESS=0.0.0.0
 set -e
 
 start_mongod_docker() {
-    echo `sudo docker run --detach --net ${NET} ${IMAGE} mongod --replSet rs$1 --shardsvr --bind_ip ${BIND_ADDRESS}`
+    DATA_PATH=/data/shard${1}${2}
+    sudo mkdir -p $DATA_PATH > /dev/null
+    echo `sudo docker run --detach -v /data --net ${NET} ${IMAGE} mongod --replSet rs$1 --shardsvr --bind_ip ${BIND_ADDRESS}`
 }
 
 start_mongocfg_docker() {
@@ -29,7 +31,7 @@ get_ip_from_id() {
 
 start_shard() {
     # start docker containers for 3xreplicaset rs0
-    SHARD00_ID=`start_mongod_docker $1`
+    SHARD00_ID=`start_mongod_docker $1 0`
     SHARD00_IP=`get_ip_from_id $SHARD00_ID`
     echo "Your shard container ${SHARD00_ID} listen on ip: ${SHARD00_IP} (waiting that becomes ready)"
     until sudo docker logs ${SHARD00_ID} | grep "waiting for connections on port" > /dev/null;
@@ -37,7 +39,7 @@ start_shard() {
         sleep 2
     done
 
-    SHARD01_ID=`start_mongod_docker $1`
+    SHARD01_ID=`start_mongod_docker $1 1`
     SHARD01_IP=`get_ip_from_id $SHARD01_ID`
     echo "Your shard container ${SHARD01_ID} listen on ip: ${SHARD01_IP} (waiting that becomes ready)"
     until sudo docker logs ${SHARD01_ID} | grep "waiting for connections on port" > /dev/null;
@@ -45,7 +47,7 @@ start_shard() {
         sleep 2
     done
 
-    SHARD02_ID=`start_mongod_docker $1`
+    SHARD02_ID=`start_mongod_docker $1 2`
     SHARD02_IP=`get_ip_from_id $SHARD02_ID`
     echo "Your shard container ${SHARD02_ID} listen on ip: ${SHARD02_IP} (waiting that becomes ready)"
     until sudo docker logs ${SHARD02_ID} | grep "waiting for connections on port" > /dev/null;
@@ -114,7 +116,7 @@ echo "The config is available now..."
 MONGOS0_ID=`start_mongos_docker ${CONFIG0_IP}:27019`
 MONGOS0_IP=`get_ip_from_id $MONGOS0_ID`
 
-for i in `seq 0 ${1:-0}`; do
+for i in `seq 0 $((${1:-1} - 1))`; do
     start_shard $i
 done
 
