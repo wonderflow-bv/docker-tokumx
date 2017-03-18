@@ -10,6 +10,7 @@ CONFIG_PORT=27019
 IMAGE="mongo:3.2"
 NET="my-mongo-cluster"
 BIND_ADDRESS=0.0.0.0
+DATA_ROOT=/data
 
 set -e
 docker network rm my-mongo-cluster
@@ -21,12 +22,12 @@ get_ip_from_id() {
 
 start_mongod_docker() {
     # echo "Starting a docker instance - shard${1}${2}"
-    DATA_PATH="/data/db/shard${1}${2}"
+    DATA_PATH="$DATA_ROOT/db/shard${1}${2}"
     echo `docker run --detach -v ${DATA_PATH}:${DATA_PATH} --net ${NET} ${IMAGE} mongod --replSet rs$1 --dbpath ${DATA_PATH} --shardsvr --bind_ip ${BIND_ADDRESS}`
 }
 
 start_mongocfg_docker() {
-    CFG_PATH="/data/configdb/cfg${1}"
+    CFG_PATH="DATA_ROOT/configdb/cfg${1}"
     echo `docker run --detach -v ${CFG_PATH}:${CFG_PATH} --net ${NET} ${IMAGE} mongod --dbpath ${CFG_PATH} --replSet cfg --configsvr --bind_ip ${BIND_ADDRESS}`
 }
 
