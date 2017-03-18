@@ -1,7 +1,7 @@
 all: start-cluster
 
 tokumx-container:
-	sudo docker pull "ankurcha/tokumx"
+	docker pull "ankurcha/tokumx"
 
 start-cluster:
 	bash ./bin/start-cluster.sh $(instances)

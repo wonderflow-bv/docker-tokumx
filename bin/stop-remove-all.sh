@@ -1,3 +1,3 @@
-sudo docker stop $(sudo docker ps -a -q)
-sudo docker rm $(sudo docker ps -a -q)
-sudo docker volume rm $(sudo docker volume ls -qf dangling=true)
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+docker volume rm $(docker volume ls -qf dangling=true)
